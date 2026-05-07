@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Calculus — Smart Calculator Suite</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --gold: #c9a84c;
+      --gold-light: #e8d08a;
+      --gold-dim: #7a6228;
+      --bg: #0d0c0a;
+      --bg2: #141310;
+      --bg3: #1c1a16;
+      --bg4: #242118;
+      --border: rgba(201,168,76,0.18);
+      --border-hover: rgba(201,168,76,0.45);
+      --text: #f0ead8;
+      --text-dim: #8a8070;
+      --text-muted: #4a4538;
+      --radius: 4px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0.4;
+    }
+    header {
+      text-align: center;
+      padding: 3rem 1rem 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2.8rem;
+      font-weight: 300;
+      letter-spacing: 0.25em;
+      color: var(--gold);
+      text-transform: uppercase;
+    }
+    .logo span { font-style: italic; font-weight: 400; }
+    .tagline {
+      font-size: 10px;
+      letter-spacing: 0.35em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      margin-top: 0.4rem;
+    }
+    nav {
+      display: flex;
+      justify-content: center;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    nav button {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: 1rem 1.6rem;
+      color: var(--text-dim);
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    nav button:hover { color: var(--gold-light); }
+    nav button.active { color: var(--gold); border-bottom-color: var(--gold); }
+    main { max-width: 520px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+    .panel { display: none; animation: fadeUp 0.3s ease; }
+    .panel.active { display: block; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .panel-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.6rem;
+      font-weight: 300;
+      color: var(--gold-light);
+      letter-spacing: 0.1em;
+      margin-bottom: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+    .panel-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* CALCULATOR */
+    .calc-display {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.2rem 1.4rem 1rem;
+      margin-bottom: 1px;
+      text-align: right;
+      min-height: 96px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+    .calc-expr { font-size: 12px; color: var(--text-muted); min-height: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: 0.05em; }
+    .calc-result { font-size: 40px; font-weight: 300; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.1; letter-spacing: -0.02em; }
+    .calc-result.error { color: #c97a6c; }
+    .calc-keys {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 var(--radius) var(--radius);
+      overflow: hidden;
+    }
+    .key {
+      background: var(--bg2);
+      border: none;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 15px;
+      font-weight: 400;
+      height: 62px;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .key:hover { background: var(--bg3); }
+    .key:active { background: var(--bg4); transform: scale(0.96); }
+    .key.fn { color: var(--text-dim); font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; background: var(--bg3); }
+    .key.fn:hover { background: var(--bg4); }
+    .key.op { color: var(--gold); font-size: 18px; }
+    .key.eq { background: var(--gold-dim); color: var(--gold-light); font-size: 20px; }
+    .key.eq:hover { background: var(--gold); color: var(--bg); }
+    .key.zero { grid-column: span 2; }
+
+    /* SHARED FORMS */
+    .field { margin-bottom: 1.2rem; }
+    .field label { display: block; font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.5rem; }
+    .field input, .field select {
+      width: 100%;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem 1rem;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .field input:focus, .field select:focus { border-color: var(--gold-dim); }
+    .field select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23c9a84c' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 1rem center;
+      padding-right: 2.5rem;
+      cursor: pointer;
+    }
+    .field select option { background: #1c1a16; }
+    .row-2 { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 0.8rem; margin-bottom: 1.2rem; }
+    .swap-btn {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--gold);
+      font-size: 18px;
+      width: 42px;
+      height: 48px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .swap-btn:hover { background: var(--bg4); border-color: var(--gold-dim); }
+    .action-btn {
+      width: 100%;
+      padding: 0.85rem;
+      background: none;
+      border: 1px solid var(--gold-dim);
+      border-radius: var(--radius);
+      color: var(--gold);
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 0.5rem;
+    }
+    .action-btn:hover { background: var(--gold-dim); color: var(--bg); }
+    .result-box {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.4rem;
+      margin-top: 1.5rem;
+      display: none;
+    }
+    .result-box.show { display: block; animation: fadeUp 0.25s ease; }
+    .result-label { font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.5rem; }
+    .result-value { font-family: 'Cormorant Garamond', serif; font-size: 2.4rem; font-weight: 300; color: var(--gold-light); letter-spacing: 0.05em; line-height: 1.1; }
+    .result-sub { font-size: 11px; color: var(--text-dim); margin-top: 0.5rem; line-height: 1.7; }
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-top: 1.5rem;
+    }
+    .result-cell { background: var(--bg2); padding: 1rem 1.2rem; }
+    .result-cell .lbl { font-size: 9px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.3rem; }
+    .result-cell .val { font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; font-weight: 300; color: var(--gold-light); }
+    .result-cell .unit { font-size: 11px; color: var(--text-dim); margin-left: 4px; }
+    .divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
+    .note { font-size: 10px; color: var(--text-muted); margin-top: 1rem; line-height: 1.8; letter-spacing: 0.03em; }
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      border-top: 1px solid var(--border);
+      font-size: 10px;
+      letter-spacing: 0.25em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Cal<span>cu</span>lus</div>
+  <div class="tagline">The refined calculation suite</div>
+</header>
+
+<nav>
+  <button class="active" onclick="switchTab('calc',this)">Calculator</button>
+  <button onclick="switchTab('currency',this)">Currency</button>
+  <button onclick="switchTab('age',this)">Age &amp; Birth</button>
+  <button onclick="switchTab('converter',this)">Converter</button>
+</nav>
+
+<main>
+
+  <!-- STANDARD CALCULATOR -->
+  <div class="panel active" id="panel-calc">
+    <div class="panel-title">Standard</div>
+    <div class="calc-display">
+      <div class="calc-expr" id="c-expr"></div>
+      <div class="calc-result" id="c-result">0</div>
+    </div>
+    <div class="calc-keys" id="calc-keys">
+      <button class="key fn" data-a="ac">AC</button>
+      <button class="key fn" data-a="sign">±</button>
+      <button class="key fn" data-a="pct">%</button>
+      <button class="key op" data-a="op" data-v="/">÷</button>
+      <button class="key" data-a="num" data-v="7">7</button>
+      <button class="key" data-a="num" data-v="8">8</button>
+      <button class="key" data-a="num" data-v="9">9</button>
+      <button class="key op" data-a="op" data-v="*">×</button>
+      <button class="key" data-a="num" data-v="4">4</button>
+      <button class="key" data-a="num" data-v="5">5</button>
+      <button class="key" data-a="num" data-v="6">6</button>
+      <button class="key op" data-a="op" data-v="-">−</button>
+      <button class="key" data-a="num" data-v="1">1</button>
+      <button class="key" data-a="num" data-v="2">2</button>
+      <button class="key" data-a="num" data-v="3">3</button>
+      <button class="key op" data-a="op" data-v="+">+</button>
+      <button class="key zero" data-a="num" data-v="0">0</button>
+      <button class="key" data-a="dot">.</button>
+      <button class="key eq" data-a="eq">=</button>
+    </div>
+  </div>
+
+  <!-- CURRENCY CONVERTER -->
+  <div class="panel" id="panel-currency">
+    <div class="panel-title">Currency</div>
+    <div class="field">
+      <label>Amount</label>
+      <input type="number" id="cur-amount" placeholder="100" value="100" min="0"/>
+    </div>
+    <div class="row-2">
+      <div class="field" style="margin:0">
+        <label>From</label>
+        <select id="cur-from"></select>
+      </div>
+      <button class="swap-btn" onclick="swapCurrency()" title="Swap">⇌</button>
+      <div class="field" style="margin:0">
+        <label>To</label>
+        <select id="cur-to"></select>
+      </div>
+    </div>
+    <button class="action-btn" onclick="convertCurrency()">Convert</button>
+    <div class="result-box" id="cur-result">
+      <div class="result-label">Converted Amount</div>
+      <div class="result-value" id="cur-value">—</div>
+      <div class="result-sub" id="cur-rate">—</div>
+    </div>
+    <p class="note">* Rates are illustrative fixed reference values. For live rates, connect to an exchange API.</p>
+  </div>
+
+  <!-- AGE & BIRTH YEAR -->
+  <div class="panel" id="panel-age">
+    <div class="panel-title">Age &amp; Birth</div>
+    <div class="field">
+      <label>Date of Birth</label>
+      <input type="date" id="dob-input"/>
+    </div>
+    <button class="action-btn" onclick="calcAge()">Calculate Age</button>
+    <div class="result-grid" id="age-grid" style="display:none">
+      <div class="result-cell"><div class="lbl">Years</div><div class="val" id="age-years">—</div></div>
+      <div class="result-cell"><div class="lbl">Months</div><div class="val" id="age-months">—</div></div>
+      <div class="result-cell"><div class="lbl">Days</div><div class="val" id="age-days">—</div></div>
+      <div class="result-cell"><div class="lbl">Next Birthday</div><div class="val" id="age-next" style="font-size:1.2rem">—</div></div>
+    </div>
+    <div class="divider"></div>
+    <div class="panel-title" style="font-size:1.2rem; margin-bottom:1.5rem">Birth Year Finder</div>
+    <div class="field">
+      <label>Current Age</label>
+      <input type="number" id="by-age" placeholder="e.g. 28" min="0" max="130"/>
+    </div>
+    <button class="action-btn" onclick="calcBirthYear()">Find Birth Year</button>
+    <div class="result-box" id="by-result">
+      <div class="result-label">Estimated Birth Year</div>
+      <div class="result-value" id="by-value">—</div>
+      <div class="result-sub" id="by-sub">—</div>
+    </div>
+  </div>
+
+  <!-- UNIT CONVERTER -->
+  <div class="panel" id="panel-converter">
+    <div class="panel-title">Unit Converter</div>
+    <div class="field">
+      <label>Category</label>
+      <select id="conv-cat" onchange="updateConvUnits()"></select>
+    </div>
+    <div class="row-2">
+      <div class="field" style="margin:0">
+        <label>From</label>
+        <select id="conv-from" onchange="doConvert()"></select>
+      </div>
+      <button class="swap-btn" onclick="swapUnits()" title="Swap">⇌</button>
+      <div class="field" style="margin:0">
+        <label>To</label>
+        <select id="conv-to" onchange="doConvert()"></select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Value</label>
+      <input type="number" id="conv-val" placeholder="Enter value" oninput="doConvert()"/>
+    </div>
+    <div class="result-box show" id="conv-result">
+      <div class="result-label">Result</div>
+      <div class="result-value" id="conv-value">—</div>
+      <div class="result-sub" id="conv-formula">Enter a value above</div>
+    </div>
+  </div>
+
+</main>
+
+<footer>Calculus &mdash; Precision in every calculation</footer>
+
+<script>
+// TAB SWITCHING
+function switchTab(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// STANDARD CALCULATOR
+let cCur='0', cPrev='', cOp=null, cNew=true;
+const cResult = document.getElementById('c-result');
+const cExpr   = document.getElementById('c-expr');
+const opSym   = {'+':'+','-':'−','*':'×','/':'÷'};
+
+function cFmt(n) {
+  let num = parseFloat(n);
+  if (isNaN(num)) return n;
+  let s = parseFloat(num.toPrecision(12)).toString();
+  if (s.length > 14) s = num.toExponential(5);
+  return s;
+}
+function cSet(v, err) {
+  cResult.textContent = v;
+  cResult.className = 'calc-result' + (err ? ' error' : '');
+}
+function calcOp(a, b, op) {
+  if (op==='/'&&b===0) return null;
+  if (op==='+') return a+b;
+  if (op==='-') return a-b;
+  if (op==='*') return a*b;
+  if (op==='/') return a/b;
+}
+function cPress(a, v) {
+  if (a==='ac') { cCur='0';cPrev='';cOp=null;cNew=true;cExpr.textContent='';cSet('0'); }
+  else if (a==='num') { cCur=cNew?v:(cCur==='0'?v:cCur+v); cNew=false; cSet(cFmt(cCur)); }
+  else if (a==='dot') { if(cNew){cCur='0.';cNew=false;}else if(!cCur.includes('.'))cCur+='.'; cSet(cCur); }
+  else if (a==='sign') { if(cCur!=='0'){cCur=cCur.startsWith('-')?cCur.slice(1):'-'+cCur; cSet(cFmt(cCur));} }
+  else if (a==='pct') { cCur=String(parseFloat(cCur)/100); cSet(cFmt(cCur)); }
+  else if (a==='op') {
+    if(cOp&&!cNew){ let r=calcOp(parseFloat(cPrev),parseFloat(cCur),cOp); if(r===null){cSet('Error',true);cExpr.textContent='';cOp=null;cNew=true;return;} cCur=String(parseFloat(r.toPrecision(12))); }
+    cPrev=cCur;cOp=v;cNew=true;
+    cExpr.textContent=cFmt(cPrev)+' '+opSym[v];
+    cSet(cFmt(cCur));
+  } else if (a==='eq') {
+    if(!cOp) return;
+    let r=calcOp(parseFloat(cPrev),parseFloat(cCur),cOp);
+    cExpr.textContent=cFmt(cPrev)+' '+opSym[cOp]+' '+cFmt(cCur)+' =';
+    if(r===null){cSet('Error',true);cOp=null;cNew=true;return;}
+    cCur=String(parseFloat(r.toPrecision(12)));cOp=null;cNew=true;cSet(cFmt(cCur));
+  }
+}
+document.getElementById('calc-keys').addEventListener('click', e => {
+  const b=e.target.closest('[data-a]'); if(b) cPress(b.dataset.a, b.dataset.v);
+});
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('panel-calc').classList.contains('active')) return;
+  if (e.target.tagName==='INPUT') return;
+  if ('0123456789'.includes(e.key)) cPress('num',e.key);
+  else if ('+-*/'.includes(e.key)) cPress('op',e.key);
+  else if (e.key==='.') cPress('dot');
+  else if (e.key==='Enter'||e.key==='=') cPress('eq');
+  else if (e.key==='Escape'||e.key==='Backspace') cPress('ac');
+  else if (e.key==='%') cPress('pct');
+});
+
+// CURRENCY CONVERTER
+const currencies = [
+  {code:'USD',name:'US Dollar',sym:'$',rate:1},
+  {code:'EUR',name:'Euro',sym:'€',rate:0.92},
+  {code:'GBP',name:'British Pound',sym:'£',rate:0.79},
+  {code:'JPY',name:'Japanese Yen',sym:'¥',rate:149.5},
+  {code:'CAD',name:'Canadian Dollar',sym:'CA$',rate:1.36},
+  {code:'AUD',name:'Australian Dollar',sym:'A$',rate:1.53},
+  {code:'CHF',name:'Swiss Franc',sym:'Fr',rate:0.90},
+  {code:'CNY',name:'Chinese Yuan',sym:'¥',rate:7.24},
+  {code:'INR',name:'Indian Rupee',sym:'₹',rate:83.1},
+  {code:'MXN',name:'Mexican Peso',sym:'MX$',rate:17.2},
+  {code:'BRL',name:'Brazilian Real',sym:'R$',rate:4.97},
+  {code:'SGD',name:'Singapore Dollar',sym:'S$',rate:1.34},
+  {code:'HKD',name:'Hong Kong Dollar',sym:'HK$',rate:7.82},
+  {code:'KRW',name:'Korean Won',sym:'₩',rate:1325},
+  {code:'SEK',name:'Swedish Krona',sym:'kr',rate:10.4},
+  {code:'AED',name:'UAE Dirham',sym:'د.إ',rate:3.67},
+  {code:'SAR',name:'Saudi Riyal',sym:'SR',rate:3.75},
+  {code:'ZAR',name:'South African Rand',sym:'R',rate:18.6},
+];
+(function populateCurrencies() {
+  const f=document.getElementById('cur-from'), t=document.getElementById('cur-to');
+  currencies.forEach((c,i)=>{ f.add(new Option(c.code+' — '+c.name,c.code,i===0,i===0)); t.add(new Option(c.code+' — '+c.name,c.code,i===1,i===1)); });
+})();
+function convertCurrency() {
+  const amt=parseFloat(document.getElementById('cur-amount').value)||0;
+  const fc=currencies.find(c=>c.code===document.getElementById('cur-from').value);
+  const tc=currencies.find(c=>c.code===document.getElementById('cur-to').value);
+  const result=(amt/fc.rate)*tc.rate;
+  const rate=tc.rate/fc.rate;
+  document.getElementById('cur-value').textContent=tc.sym+result.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+tc.code;
+  document.getElementById('cur-rate').textContent='1 '+fc.code+' = '+rate.toFixed(4)+' '+tc.code+'  ·  1 '+tc.code+' = '+(1/rate).toFixed(4)+' '+fc.code;
+  document.getElementById('cur-result').classList.add('show');
+}
+function swapCurrency() {
+  const f=document.getElementById('cur-from'),t=document.getElementById('cur-to');
+  [f.value,t.value]=[t.value,f.value];
+}
+
+// AGE & BIRTH YEAR CALCULATOR
+function calcAge() {
+  const dob=new Date(document.getElementById('dob-input').value);
+  if(isNaN(dob)) return;
+  const now=new Date();
+  let yrs=now.getFullYear()-dob.getFullYear(), mo=now.getMonth()-dob.getMonth(), dy=now.getDate()-dob.getDate();
+  if(dy<0){mo--;dy+=new Date(now.getFullYear(),now.getMonth(),0).getDate();}
+  if(mo<0){yrs--;mo+=12;}
+  let next=new Date(now.getFullYear(),dob.getMonth(),dob.getDate());
+  if(next<=now) next.setFullYear(now.getFullYear()+1);
+  const daysToB=Math.ceil((next-now)/86400000);
+  document.getElementById('age-years').textContent=yrs;
+  document.getElementById('age-months').textContent=mo;
+  document.getElementById('age-days').textContent=dy;
+  document.getElementById('age-next').innerHTML=daysToB+'<span class="unit"> days</span>';
+  document.getElementById('age-grid').style.display='grid';
+}
+function calcBirthYear() {
+  const age=parseInt(document.getElementById('by-age').value);
+  if(isNaN(age)||age<0||age>130) return;
+  const now=new Date().getFullYear();
+  document.getElementById('by-value').textContent=(now-age-1)+' – '+(now-age);
+  document.getElementById('by-sub').textContent='Someone turning '+age+' this year was born in '+(now-age-1)+' or '+(now-age)+', depending on their birthday.';
+  document.getElementById('by-result').classList.add('show');
+}
+
+// UNIT CONVERTER
+const convData = {
+  Length:      { units:['Meter','Kilometer','Mile','Yard','Foot','Inch','Centimeter','Millimeter'], toBase:[1,1000,1609.344,0.9144,0.3048,0.0254,0.01,0.001] },
+  Weight:      { units:['Kilogram','Gram','Pound','Ounce','Stone','Metric Ton','Milligram'],        toBase:[1,0.001,0.453592,0.0283495,6.35029,1000,0.000001] },
+  Temperature: { units:['Celsius','Fahrenheit','Kelvin'], toBase:null },
+  Area:        { units:['Square Meter','Square Kilometer','Square Mile','Acre','Hectare','Square Foot'], toBase:[1,1e6,2589988.11,4046.856,10000,0.092903] },
+  Volume:      { units:['Liter','Milliliter','Cubic Meter','Gallon (US)','Quart','Pint','Cup','Fluid Ounce'], toBase:[1,0.001,1000,3.78541,0.946353,0.473176,0.236588,0.0295735] },
+  Speed:       { units:['m/s','km/h','mph','knot','ft/s'],                                         toBase:[1,0.277778,0.44704,0.514444,0.3048] },
+  Time:        { units:['Second','Minute','Hour','Day','Week','Month (avg)','Year'],                toBase:[1,60,3600,86400,604800,2629800,31557600] },
+  Data:        { units:['Byte','Kilobyte','Megabyte','Gigabyte','Terabyte','Bit'],                  toBase:[1,1024,1048576,1073741824,1099511627776,0.125] },
+};
+(function populateConvCats() {
+  const sel=document.getElementById('conv-cat');
+  Object.keys(convData).forEach(k=>sel.add(new Option(k,k)));
+  updateConvUnits();
+})();
+function updateConvUnits() {
+  const cat=document.getElementById('conv-cat').value, units=convData[cat].units;
+  const f=document.getElementById('conv-from'), t=document.getElementById('conv-to');
+  f.innerHTML=''; t.innerHTML='';
+  units.forEach((u,i)=>{ f.add(new Option(u,i)); t.add(new Option(u,i)); });
+  t.selectedIndex=1;
+  doConvert();
+}
+function swapUnits() {
+  const f=document.getElementById('conv-from'),t=document.getElementById('conv-to');
+  [f.value,t.value]=[t.value,f.value]; doConvert();
+}
+function doConvert() {
+  const cat=document.getElementById('conv-cat').value;
+  const val=parseFloat(document.getElementById('conv-val').value);
+  const fi=parseInt(document.getElementById('conv-from').value);
+  const ti=parseInt(document.getElementById('conv-to').value);
+  const d=convData[cat];
+  if(isNaN(val)){ document.getElementById('conv-value').textContent='—'; document.getElementById('conv-formula').textContent='Enter a value above'; return; }
+  let result;
+  if(cat==='Temperature'){
+    let c; if(fi===0)c=val; else if(fi===1)c=(val-32)*5/9; else c=val-273.15;
+    if(ti===0)result=c; else if(ti===1)result=c*9/5+32; else result=c+273.15;
+  } else {
+    result=(val*d.toBase[fi])/d.toBase[ti];
+  }
+  const fmt=Math.abs(result)<0.0001&&result!==0?result.toExponential(4):parseFloat(result.toPrecision(8)).toLocaleString('en',{maximumFractionDigits:6});
+  document.getElementById('conv-value').textContent=fmt+' '+d.units[ti];
+  document.getElementById('conv-formula').textContent=val+' '+d.units[fi]+' = '+fmt+' '+d.units[ti];
+}
+</script>
+</body>
+</html>
